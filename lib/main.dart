@@ -1,5 +1,3 @@
-import 'dart:math' show pi;
-
 import 'package:flutter/material.dart';
 
 void main() {
@@ -15,65 +13,60 @@ void main() {
   );
 }
 
-class HomePage extends StatefulWidget {
-  const HomePage({super.key});
-
-  @override
-  State<HomePage> createState() => _HomePageState();
+enum CircleSide {
+  left,
+  right,
 }
 
-class _HomePageState extends State<HomePage>
-    with SingleTickerProviderStateMixin {
-  late AnimationController _controller;
-  late Animation<double> _animation;
-
-  @override
-  void initState() {
-    _controller = AnimationController(
-      vsync: this,
-      duration: const Duration(seconds: 2),
+extension ToPath on CircleSide {
+  Path toPath(Size size) {
+    var path = Path();
+    late Offset offset;
+    late bool clockWise;
+    switch (this) {
+      case CircleSide.left:
+        path.moveTo(size.width, 0);
+        offset = Offset(size.width, size.height);
+        clockWise = false;
+        break;
+      case CircleSide.right:
+        offset = Offset(0, size.height);
+        clockWise = true;
+        break;
+    }
+    path.arcToPoint(
+      offset,
+      radius: Radius.elliptical(
+        size.width / 2,
+        size.height / 2,
+      ),
+      clockwise: clockWise,
     );
-    _animation = Tween<double>(
-      begin: 0.0,
-      end: 2 * pi,
-    ).animate(_controller);
-    _controller.repeat();
-
-    super.initState();
+    path.close();
   }
+}
 
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
+class HomePage extends StatelessWidget {
+  const HomePage({super.key});
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Center(
-        child: AnimatedBuilder(
-          animation: _animation,
-          builder: (context, _) => Transform(
-            alignment: Alignment.center,
-            transform: Matrix4.identity()..rotateY(_animation.value),
-            child: Container(
+      body: SafeArea(
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              color: Colors.blue,
               height: 100,
               width: 100,
-              decoration: BoxDecoration(
-                color: Colors.blue,
-                borderRadius: BorderRadius.circular(10),
-                boxShadow: const [
-                  BoxShadow(
-                    color: Colors.black,
-                    spreadRadius: 5,
-                    blurRadius: 7,
-                    offset: Offset(0, 3),
-                  )
-                ],
-              ),
             ),
-          ),
+            Container(
+              color: Colors.yellow,
+              height: 100,
+              width: 100,
+            ),
+          ],
         ),
       ),
     );
