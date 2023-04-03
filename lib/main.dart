@@ -1,12 +1,13 @@
+import 'dart:math' show cos, max, min, pi, sin;
+
 import 'package:flutter/material.dart';
-import 'dart:math' as math;
 
 void main() {
   runApp(
     MaterialApp(
       title: 'Flutter Demo',
       theme: ThemeData(
-        primarySwatch: Colors.blue,
+        brightness: Brightness.dark,
       ),
       home: const HomePage(),
       debugShowCheckedModeBanner: false,
@@ -14,33 +15,49 @@ void main() {
   );
 }
 
-class CircleClipper extends CustomClipper<Path> {
-  const CircleClipper();
-  @override
-  Path getClip(Size size) {
-    var path = Path();
+class Polygon extends CustomPainter {
+  final int sides;
 
-    final rect = Rect.fromCircle(
-      center: Offset(size.width / 2, size.height / 2),
-      radius: size.width / 2,
+  Polygon({
+    required this.sides,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = Colors.blue
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round
+      ..strokeWidth = 3;
+
+    final path = Path();
+
+    final center = Offset(size.width / 2, size.height / 2);
+    final angle = 2 * pi / sides;
+
+    final angles = List.generate(sides, (index) => index * angle);
+
+    final radius = size.width / 2;
+
+    path.moveTo(
+      center.dx + radius * cos(0),
+      center.dy + radius * sin(0),
     );
 
-    path.addOval(rect);
+    for (final angle in angles) {
+      path.lineTo(
+        center.dx + radius * cos(angle),
+        center.dy + radius * sin(angle),
+      );
+    }
+    path.close();
 
-    return path;
+    canvas.drawPath(path, paint);
   }
 
   @override
-  bool shouldReclip(covariant CustomClipper<Path> oldClipper) => false;
-}
-
-Color getRandomColor() {
-  return Color.fromARGB(
-    255,
-    math.Random().nextInt(256),
-    math.Random().nextInt(256),
-    math.Random().nextInt(256),
-  );
+  bool shouldRepaint(covariant CustomPainter oldDelegate) =>
+      oldDelegate is Polygon && oldDelegate.sides != sides;
 }
 
 class HomePage extends StatefulWidget {
@@ -50,41 +67,101 @@ class HomePage extends StatefulWidget {
   State<HomePage> createState() => _HomePageState();
 }
 
-class _HomePageState extends State<HomePage> {
-  var _color = getRandomColor();
+class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
+  late AnimationController _sidesController;
+  late Animation<int> _sidesAnimation;
+
+  late AnimationController _radiusController;
+  late Animation<double> _radiusAnimation;
+
+  late AnimationController _rotationController;
+  late Animation<double> _rotationAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _sidesController = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 3),
+    );
+    _sidesAnimation = IntTween(
+      begin: 10,
+      end: 3,
+    ).animate(_sidesController);
+
+    _radiusController = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 3),
+    );
+    _radiusAnimation = Tween<double>(
+      begin: 1.0,
+      end: 0.0,
+    )
+        .chain(
+          CurveTween(curve: Curves.bounceInOut),
+        )
+        .animate(_radiusController);
+
+    _rotationController = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 3),
+    );
+    _rotationAnimation = Tween<double>(
+      begin: 0.0,
+      end: 2 * pi,
+    )
+        .chain(
+          CurveTween(curve: Curves.easeInOut),
+        )
+        .animate(_rotationController);
+  }
+
+  @override
+  void dispose() {
+    _sidesController.dispose();
+    _radiusController.dispose();
+    _rotationController.dispose();
+    super.dispose();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _sidesController.repeat(reverse: true);
+    _radiusController.repeat(reverse: true);
+    _rotationController.repeat(reverse: true);
+  }
 
   @override
   Widget build(BuildContext context) {
     final width = MediaQuery.of(context).size.width;
+
     return Scaffold(
       body: Center(
-        child: ClipPath(
-          clipper: const CircleClipper(),
-          child: TweenAnimationBuilder(
-            tween: ColorTween(
-              begin: getRandomColor(),
-              end: _color,
-            ),
-            onEnd: () {
-              setState(() {
-                _color = getRandomColor();
-              });
-            },
-            duration: const Duration(seconds: 1),
-            builder: (context, color, child) {
-              return ColorFiltered(
-                colorFilter: ColorFilter.mode(
-                  color!,
-                  BlendMode.srcATop,
-                ),
-                child: Container(
-                  width: width,
-                  height: width,
-                  color: getRandomColor(),
-                ),
-              );
-            },
+        child: AnimatedBuilder(
+          animation: Listenable.merge(
+            [
+              _sidesController,
+              _radiusController,
+              _rotationController,
+            ],
           ),
+          builder: (context, child) {
+            return Transform(
+              alignment: Alignment.center,
+              transform: Matrix4.identity()
+                ..rotateX(_rotationController.value)
+                ..rotateY(_rotationController.value)
+                ..rotateZ(_rotationAnimation.value),
+              child: CustomPaint(
+                painter: Polygon(sides: _sidesAnimation.value),
+                child: SizedBox(
+                  width: max(15, width * _radiusAnimation.value),
+                  height: max(15, width * _radiusAnimation.value),
+                ),
+              ),
+            );
+          },
         ),
       ),
     );
