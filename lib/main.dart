@@ -1,167 +1,161 @@
-import 'dart:math' show cos, max, min, pi, sin;
-
 import 'package:flutter/material.dart';
+import 'dart:math' show pi;
 
 void main() {
   runApp(
-    MaterialApp(
-      title: 'Flutter Demo',
-      theme: ThemeData(
-        brightness: Brightness.dark,
-      ),
-      home: const HomePage(),
-      debugShowCheckedModeBanner: false,
-    ),
+    const App(),
   );
 }
 
-class Polygon extends CustomPainter {
-  final int sides;
-
-  Polygon({
-    required this.sides,
+class MyDrawer extends StatefulWidget {
+  final Widget child;
+  final Widget drawer;
+  const MyDrawer({
+    super.key,
+    required this.child,
+    required this.drawer,
   });
 
   @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = Colors.blue
-      ..style = PaintingStyle.stroke
-      ..strokeCap = StrokeCap.round
-      ..strokeWidth = 3;
-
-    final path = Path();
-
-    final center = Offset(size.width / 2, size.height / 2);
-    final angle = 2 * pi / sides;
-
-    final angles = List.generate(sides, (index) => index * angle);
-
-    final radius = size.width / 2;
-
-    path.moveTo(
-      center.dx + radius * cos(0),
-      center.dy + radius * sin(0),
-    );
-
-    for (final angle in angles) {
-      path.lineTo(
-        center.dx + radius * cos(angle),
-        center.dy + radius * sin(angle),
-      );
-    }
-    path.close();
-
-    canvas.drawPath(path, paint);
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) =>
-      oldDelegate is Polygon && oldDelegate.sides != sides;
+  State<MyDrawer> createState() => _MyDrawerState();
 }
 
-class HomePage extends StatefulWidget {
-  const HomePage({super.key});
+class _MyDrawerState extends State<MyDrawer> with TickerProviderStateMixin {
+  late AnimationController _xControllerForChild;
+  late Animation<double> _yRotationAnimationForChild;
 
-  @override
-  State<HomePage> createState() => _HomePageState();
-}
-
-class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
-  late AnimationController _sidesController;
-  late Animation<int> _sidesAnimation;
-
-  late AnimationController _radiusController;
-  late Animation<double> _radiusAnimation;
-
-  late AnimationController _rotationController;
-  late Animation<double> _rotationAnimation;
+  late AnimationController _xControllerForDrawer;
+  late Animation<double> _yRotationAnimationForDrawer;
 
   @override
   void initState() {
     super.initState();
-    _sidesController = AnimationController(
+    _xControllerForChild = AnimationController(
       vsync: this,
-      duration: const Duration(seconds: 3),
+      duration: const Duration(milliseconds: 500),
     );
-    _sidesAnimation = IntTween(
-      begin: 10,
-      end: 3,
-    ).animate(_sidesController);
+    _yRotationAnimationForChild = Tween<double>(
+      begin: 0,
+      end: -pi / 2,
+    ).animate(_xControllerForChild);
 
-    _radiusController = AnimationController(
+    _xControllerForDrawer = AnimationController(
       vsync: this,
-      duration: const Duration(seconds: 3),
+      duration: const Duration(milliseconds: 500),
     );
-    _radiusAnimation = Tween<double>(
-      begin: 1.0,
-      end: 0.0,
-    )
-        .chain(
-          CurveTween(curve: Curves.bounceInOut),
-        )
-        .animate(_radiusController);
-
-    _rotationController = AnimationController(
-      vsync: this,
-      duration: const Duration(seconds: 3),
-    );
-    _rotationAnimation = Tween<double>(
-      begin: 0.0,
-      end: 2 * pi,
-    )
-        .chain(
-          CurveTween(curve: Curves.easeInOut),
-        )
-        .animate(_rotationController);
+    _yRotationAnimationForDrawer = Tween<double>(
+      begin: pi / 2.7,
+      end: 0,
+    ).animate(_xControllerForDrawer);
   }
 
   @override
   void dispose() {
-    _sidesController.dispose();
-    _radiusController.dispose();
-    _rotationController.dispose();
+    _xControllerForChild.dispose();
+    _xControllerForDrawer.dispose();
     super.dispose();
   }
 
   @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    _sidesController.repeat(reverse: true);
-    _radiusController.repeat(reverse: true);
-    _rotationController.repeat(reverse: true);
+  Widget build(BuildContext context) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final maxDrag = screenWidth * 0.8;
+
+    return GestureDetector(
+      onHorizontalDragUpdate: (details) {
+        final delta = details.delta.dx / maxDrag;
+        _xControllerForChild.value += delta;
+        _xControllerForDrawer.value += delta;
+      },
+      onHorizontalDragEnd: (details) {
+        if (_xControllerForChild.value < 0.5) {
+          _xControllerForChild.reverse();
+          _xControllerForDrawer.reverse();
+        } else {
+          _xControllerForChild.forward();
+          _xControllerForDrawer.forward();
+        }
+      },
+      child: AnimatedBuilder(
+        animation: Listenable.merge([
+          _xControllerForChild,
+          _xControllerForDrawer,
+        ]),
+        builder: (context, child) {
+          return Stack(
+            children: [
+              Container(
+                color: const Color(0xFF1a1b26),
+              ),
+              Transform(
+                alignment: Alignment.centerLeft,
+                transform: Matrix4.identity()
+                  ..setEntry(3, 2, 0.001)
+                  ..translate(_xControllerForChild.value * maxDrag)
+                  ..rotateY(_yRotationAnimationForChild.value),
+                child: widget.child,
+              ),
+              Transform(
+                alignment: Alignment.centerRight,
+                transform: Matrix4.identity()
+                  ..setEntry(3, 2, 0.001)
+                  ..translate(
+                      -screenWidth + _xControllerForDrawer.value * maxDrag)
+                  ..rotateY(_yRotationAnimationForDrawer.value),
+                child: widget.drawer,
+              ),
+            ],
+          );
+        },
+      ),
+    );
   }
+}
+
+class App extends StatelessWidget {
+  const App({
+    Key? key,
+  }) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
-    final width = MediaQuery.of(context).size.width;
+    return MaterialApp(
+      theme: ThemeData(brightness: Brightness.dark),
+      darkTheme: ThemeData(brightness: Brightness.dark),
+      themeMode: ThemeMode.dark,
+      debugShowCheckedModeBanner: false,
+      debugShowMaterialGrid: false,
+      home: const HomePage(),
+    );
+  }
+}
 
-    return Scaffold(
-      body: Center(
-        child: AnimatedBuilder(
-          animation: Listenable.merge(
-            [
-              _sidesController,
-              _radiusController,
-              _rotationController,
-            ],
+class HomePage extends StatelessWidget {
+  const HomePage({Key? key}) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return MyDrawer(
+      drawer: Material(
+        child: Container(
+          color: const Color(0xff24283b),
+          child: ListView.builder(
+            padding: const EdgeInsets.only(left: 100, top: 100),
+            itemCount: 20,
+            itemBuilder: (context, index) {
+              return ListTile(
+                title: Text('Item $index'),
+              );
+            },
           ),
-          builder: (context, child) {
-            return Transform(
-              alignment: Alignment.center,
-              transform: Matrix4.identity()
-                ..rotateX(_rotationController.value)
-                ..rotateY(_rotationController.value)
-                ..rotateZ(_rotationAnimation.value),
-              child: CustomPaint(
-                painter: Polygon(sides: _sidesAnimation.value),
-                child: SizedBox(
-                  width: max(15, width * _radiusAnimation.value),
-                  height: max(15, width * _radiusAnimation.value),
-                ),
-              ),
-            );
-          },
+        ),
+      ),
+      child: Scaffold(
+        appBar: AppBar(
+          title: const Text('Drawer'),
+        ),
+        body: Container(
+          color: const Color(0xff414868),
         ),
       ),
     );
